@@ -10,7 +10,8 @@ export default async function handler(req, res) {
     const userText = data.voiceover_test || 'Текст не найден';
     
     // Создаем полный текст для озвучки
-    const fullText = `Вы написали: ${userText}`;
+    const fullText = `Устройтесь поудобнее и закройте глаза. 
+      Сделайте вдох и выдох. Представьте себе ${userText}`;
     
     console.log('User text:', userText);
     console.log('Full text for TTS:', fullText);
@@ -42,7 +43,7 @@ export default async function handler(req, res) {
 async function textToSpeech(text) {
   console.log('Generating TTS for:', text);
   
-  const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/pNInz6obpgDQGcFmaJgB', {
+  const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/N8lIVPsFkvOoqev5Csxo', {
     method: 'POST',
     headers: {
       'Accept': 'audio/mpeg',
