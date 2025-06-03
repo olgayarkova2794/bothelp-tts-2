@@ -1,21 +1,26 @@
 export default async function handler(req, res) {
+  console.log('Received request:', req.body);
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { message, chat_id } = req.body;
+    const data = req.body;
     
-    // Ваша логика генерации текста
-    const responseText = `Вы написали: ${message.text}`;
+    // Используем правильное название переменной из BotHelp
+    const userText = data.voiceover_test || 
+                     data.message?.text || 
+                     'Текст не найден';
     
-    // Здесь будет вызов TTS API
-    console.log('Generating audio for:', responseText);
+    console.log('User text from voiceover_test:', userText);
     
-    // Пока просто отправляем текст обратно
+    const responseText = `Вы написали: ${userText}`;
+    
     res.status(200).json({
       success: true,
-      text: responseText
+      text: responseText,
+      received_data: data // для отладки
     });
     
   } catch (error) {
