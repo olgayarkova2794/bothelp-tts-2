@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     const userText = data.voiceover_test || 'Текст не найден';
     
     // Создаем полный текст для озвучки
-    const fullText = `Вы написали: ${userText}`;
+    const fullText = `Расслабься и слушай меня. Ты идешь по дороге. И хочешь сказать:  ${userText}`;
     
     console.log('User text:', userText);
     console.log('Full text for TTS:', fullText);
