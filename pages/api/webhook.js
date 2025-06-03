@@ -10,9 +10,7 @@ export default async function handler(req, res) {
     const userText = data.voiceover_test || 'Текст не найден';
     
     // Создаем полный текст для озвучки
-    const fullText = `Устройтесь поудобнее и закройте глаза. Сделайте три глубоких вдоха, с каждым выдохом отпуская прошлое и ${userText}.
-
-Представьте перед собой дорогу, которая ведет к ${userText}.`;
+    const fullText = `Вы написали: ${userText}`;
     
     console.log('User text:', userText);
     console.log('Full text for TTS:', fullText);
@@ -27,7 +25,9 @@ export default async function handler(req, res) {
     
     res.status(200).json({
       success: true,
-      message: `Голосовое сообщение отправлено: "Вы написали: ${userText}"`
+      message: `Голосовое сообщение отправлено: "Устройтесь поудобнее и закройте глаза. 
+
+      Сделайте вдох и выдох. Представьте себе ${userText}."`
     });
     
   } catch (error) {
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
 async function textToSpeech(text) {
   console.log('Generating TTS for:', text);
   
-  const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/N8lIVPsFkvOoqev5Csxo', {
+  const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/pNInz6obpgDQGcFmaJgB', {
     method: 'POST',
     headers: {
       'Accept': 'audio/mpeg',
@@ -53,11 +53,17 @@ async function textToSpeech(text) {
       text: text,
       model_id: "eleven_multilingual_v2",
       voice_settings: {
-        stability: 0.5,
-        similarity_boost: 0.5,
+        stability: 0.7,        // Увеличено для более стабильной речи
+        similarity_boost: 0.8, // Увеличено для четкости
         style: 0.0,
         use_speaker_boost: true
-      }
+      },
+      pronunciation_dictionary_locators: [],
+      seed: null,
+      previous_text: null,
+      next_text: null,
+      previous_request_ids: [],
+      response_format: "mp3_44100_128" // Более высокое качество
     })
   });
   
