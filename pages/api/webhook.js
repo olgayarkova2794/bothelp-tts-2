@@ -9,11 +9,15 @@ export default async function handler(req, res) {
     const data = req.body;
     const userText = data.voiceover_test || 'Текст не найден';
     
+    // Создаем полный текст для озвучки
+    const fullText = `Вы написали: ${userText}`;
+    
     console.log('User text:', userText);
+    console.log('Full text for TTS:', fullText);
     console.log('Full request data:', data);
     
-    // Генерируем аудио
-    const audioBuffer = await textToSpeech(userText);
+    // Генерируем аудио для полного текста
+    const audioBuffer = await textToSpeech(fullText);
     console.log('Audio generated, size:', audioBuffer.byteLength);
     
     // Отправляем голосовое сообщение в Telegram
@@ -21,7 +25,7 @@ export default async function handler(req, res) {
     
     res.status(200).json({
       success: true,
-      message: `Голосовое сообщение отправлено для: ${userText}`
+      message: `Голосовое сообщение отправлено: "Вы написали: ${userText}"`
     });
     
   } catch (error) {
@@ -36,7 +40,7 @@ export default async function handler(req, res) {
 async function textToSpeech(text) {
   console.log('Generating TTS for:', text);
   
-  const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM', {
+  const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/pNInz6obpgDQGcFmaJgB', {
     method: 'POST',
     headers: {
       'Accept': 'audio/mpeg',
@@ -45,10 +49,12 @@ async function textToSpeech(text) {
     },
     body: JSON.stringify({
       text: text,
-      model_id: "eleven_monolingual_v1",
+      model_id: "eleven_multilingual_v2",
       voice_settings: {
         stability: 0.5,
-        similarity_boost: 0.5
+        similarity_boost: 0.5,
+        style: 0.0,
+        use_speaker_boost: true
       }
     })
   });
