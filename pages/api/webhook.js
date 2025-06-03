@@ -40,7 +40,7 @@ export default async function handler(req, res) {
 async function textToSpeech(text) {
   console.log('Generating TTS for:', text);
   
-  const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/pNInz6obpgDQGcFmaJgB', {
+  const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/N8lIVPsFkvOoqev5Csxo', {
     method: 'POST',
     headers: {
       'Accept': 'audio/mpeg',
