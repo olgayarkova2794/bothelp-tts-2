@@ -1,34 +1,25 @@
 export default async function handler(req, res) {
   console.log('Received request:', req.body);
-
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-
   try {
     const data = req.body;
     const userText = data.voiceover_test || 'Текст не найден';
     
-    // Создаем полный текст для озвучки
-    const fullText = `Устройтесь поудобнее и закройте глаза. 
-      Сделайте вдох и выдох. Представьте себе ${userText}`;
-    
     console.log('User text:', userText);
-    console.log('Full text for TTS:', fullText);
     console.log('Full request data:', data);
     
-    // Генерируем аудио для полного текста
-    const audioBuffer = await textToSpeech(fullText);
-    console.log('Audio generated, size:', audioBuffer.byteLength);
+    // Генерируем саммари медитации через OpenAI
+    const meditationSummary = await generateMeditationSummary(userText);
+    console.log('Meditation summary generated:', meditationSummary);
     
-    // Отправляем голосовое сообщение в Telegram
-    await sendVoiceToTelegram(audioBuffer, data);
+    // Отправляем текстовое сообщение в Telegram
+    await sendTextToTelegram(meditationSummary, data);
     
     res.status(200).json({
       success: true,
-      message: `Голосовое сообщение отправлено: "Устройтесь поудобнее и закройте глаза. 
-
-      Сделайте вдох и выдох. Представьте себе ${userText}."`
+      message: `Саммари медитации отправлено: "${meditationSummary}"`
     });
     
   } catch (error) {
@@ -40,44 +31,50 @@ export default async function handler(req, res) {
   }
 }
 
-async function textToSpeech(text) {
-  console.log('Generating TTS for:', text);
+async function generateMeditationSummary(userText) {
+  console.log('Generating meditation summary for:', userText);
   
-  const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/N8lIVPsFkvOoqev5Csxo', {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
-      'Accept': 'audio/mpeg',
       'Content-Type': 'application/json',
-      'xi-api-key': process.env.ELEVENLABS_API_KEY
+      'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
     },
     body: JSON.stringify({
-      text: text,
-      model_id: "eleven_multilingual_v2",
-      voice_settings: {
-        stability: 0.7,        // Увеличено для более стабильной речи
-        similarity_boost: 0.8, // Увеличено для четкости
-        style: 0.0,
-        use_speaker_boost: true
-      },
-      pronunciation_dictionary_locators: [],
-      seed: null,
-      previous_text: null,
-      next_text: null,
-      previous_request_ids: [],
-      response_format: "mp3_44100_128" // Более высокое качество
+      model: "gpt-4o", // или "gpt-3.5-turbo" для более экономичного варианта
+      messages: [
+        {
+          role: "system",
+          content: `Ты - эксперт по медитации и mindfulness. Создай краткое, успокаивающее саммари медитации на основе предоставленного текста. 
+          Саммари должно:
+          - Быть написано на русском языке
+          - Содержать 3-5 предложений
+          - Быть успокаивающим и вдохновляющим
+          - Включать основные элементы медитации: дыхание, расслабление, визуализацию
+          - Заканчиваться позитивной нотой
+          - Использовать мягкий, умиротворяющий тон`
+        },
+        {
+          role: "user",
+          content: `Создай саммари медитации на основе этого текста: "${userText}"`
+        }
+      ],
+      max_tokens: 200,
+      temperature: 0.7
     })
   });
   
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`ElevenLabs API error: ${response.status} ${errorText}`);
+    throw new Error(`OpenAI API error: ${response.status} ${errorText}`);
   }
   
-  return await response.arrayBuffer();
+  const result = await response.json();
+  return result.choices[0].message.content.trim();
 }
 
-async function sendVoiceToTelegram(audioBuffer, requestData) {
-  console.log('Sending voice to Telegram...');
+async function sendTextToTelegram(text, requestData) {
+  console.log('Sending text to Telegram...');
   
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   
@@ -100,14 +97,16 @@ async function sendVoiceToTelegram(audioBuffer, requestData) {
     throw new Error('Telegram bot token not configured');
   }
   
-  // Создаем FormData для отправки файла
-  const formData = new FormData();
-  formData.append('chat_id', chatId.toString());
-  formData.append('voice', new Blob([audioBuffer], { type: 'audio/mpeg' }), 'voice.mp3');
-  
-  const response = await fetch(`https://api.telegram.org/bot${botToken}/sendVoice`, {
+  const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: 'POST',
-    body: formData
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: text,
+      parse_mode: 'HTML' // Поддержка HTML форматирования, если нужно
+    })
   });
   
   if (!response.ok) {
@@ -116,7 +115,7 @@ async function sendVoiceToTelegram(audioBuffer, requestData) {
   }
   
   const result = await response.json();
-  console.log('Voice message sent successfully:', result.ok);
+  console.log('Text message sent successfully:', result.ok);
   
   return result;
 }
