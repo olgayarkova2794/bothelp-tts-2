@@ -1,43 +1,64 @@
 export default async function handler(req, res) {
-  console.log('Received request:', req.body);
+  console.log('=== WEBHOOK STARTED ===');
+  console.log('Received request method:', req.method);
+  console.log('Received request body:', JSON.stringify(req.body, null, 2));
+  
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  
   try {
     const data = req.body;
-    const userText = data.voiceover_test || 'Текст не найден';
+    const userText = data.voiceover_test || data.message?.text || 'Текст не найден';
     
+    console.log('=== EXTRACTED DATA ===');
     console.log('User text:', userText);
-    console.log('Full request data:', data);
+    console.log('Environment variables check:');
+    console.log('OPENAI_API_KEY exists:', !!process.env.OPENAI_API_KEY);
+    console.log('TELEGRAM_BOT_TOKEN exists:', !!process.env.TELEGRAM_BOT_TOKEN);
     
     // Генерируем саммари медитации через OpenAI
+    console.log('=== CALLING OPENAI ASSISTANT ===');
     const meditationSummary = await generateMeditationSummary(userText);
     console.log('Meditation summary generated:', meditationSummary);
     
     // Отправляем текстовое сообщение в Telegram
-    await sendTextToTelegram(meditationSummary, data);
+    console.log('=== SENDING TO TELEGRAM ===');
+    const telegramResult = await sendTextToTelegram(meditationSummary, data);
+    console.log('Telegram result:', telegramResult);
     
     res.status(200).json({
       success: true,
-      message: `Саммари медитации отправлено: "${meditationSummary}"`
+      message: `Саммари медитации отправлено: "${meditationSummary}"`,
+      telegramResult: telegramResult
     });
     
   } catch (error) {
-    console.error('Error:', error);
+    console.error('=== ERROR OCCURRED ===');
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
     res.status(500).json({ 
       error: 'Internal server error',
-      details: error.message 
+      details: error.message,
+      stack: error.stack
     });
   }
 }
 
 async function generateMeditationSummary(userText) {
-  console.log('Generating meditation summary for:', userText);
+  console.log('=== GENERATING MEDITATION SUMMARY ===');
+  console.log('Input text:', userText);
   
   const ASSISTANT_ID = "asst_FTQwIDbblkhegDXBZxd2nU9w";
   const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
   
+  if (!OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY not found in environment variables');
+  }
+  
   try {
+    console.log('Step 1: Creating thread...');
     // 1. Создаем thread (беседу)
     const threadResponse = await fetch('https://api.openai.com/v1/assistants/threads', {
       method: 'POST',
@@ -49,11 +70,18 @@ async function generateMeditationSummary(userText) {
       body: JSON.stringify({})
     });
     
+    if (!threadResponse.ok) {
+      const errorText = await threadResponse.text();
+      throw new Error(`Failed to create thread: ${threadResponse.status} ${errorText}`);
+    }
+    
     const thread = await threadResponse.json();
     const threadId = thread.id;
+    console.log('Thread created with ID:', threadId);
     
+    console.log('Step 2: Adding message to thread...');
     // 2. Добавляем сообщение пользователя в thread
-    await fetch(`https://api.openai.com/v1/assistants/threads/${threadId}/messages`, {
+    const messageResponse = await fetch(`https://api.openai.com/v1/assistants/threads/${threadId}/messages`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -66,6 +94,14 @@ async function generateMeditationSummary(userText) {
       })
     });
     
+    if (!messageResponse.ok) {
+      const errorText = await messageResponse.text();
+      throw new Error(`Failed to add message: ${messageResponse.status} ${errorText}`);
+    }
+    
+    console.log('Message added to thread');
+    
+    console.log('Step 3: Running assistant...');
     // 3. Запускаем ассистента
     const runResponse = await fetch(`https://api.openai.com/v1/assistants/threads/${threadId}/runs`, {
       method: 'POST',
@@ -79,13 +115,24 @@ async function generateMeditationSummary(userText) {
       })
     });
     
+    if (!runResponse.ok) {
+      const errorText = await runResponse.text();
+      throw new Error(`Failed to run assistant: ${runResponse.status} ${errorText}`);
+    }
+    
     const run = await runResponse.json();
     const runId = run.id;
+    console.log('Assistant run started with ID:', runId);
     
+    console.log('Step 4: Waiting for completion...');
     // 4. Ждем завершения выполнения
     let runStatus;
+    let attempts = 0;
+    const maxAttempts = 30; // Максимум 30 секунд ожидания
+    
     do {
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Ждем 1 секунду
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      attempts++;
       
       const statusResponse = await fetch(`https://api.openai.com/v1/assistants/threads/${threadId}/runs/${runId}`, {
         headers: {
@@ -94,8 +141,17 @@ async function generateMeditationSummary(userText) {
         }
       });
       
+      if (!statusResponse.ok) {
+        const errorText = await statusResponse.text();
+        throw new Error(`Failed to check status: ${statusResponse.status} ${errorText}`);
+      }
+      
       runStatus = await statusResponse.json();
-      console.log('Run status:', runStatus.status);
+      console.log(`Run status (attempt ${attempts}):`, runStatus.status);
+      
+      if (attempts >= maxAttempts) {
+        throw new Error('Assistant run timeout after 30 seconds');
+      }
       
     } while (runStatus.status === 'queued' || runStatus.status === 'in_progress');
     
@@ -103,6 +159,7 @@ async function generateMeditationSummary(userText) {
       throw new Error(`Run failed with status: ${runStatus.status}`);
     }
     
+    console.log('Step 5: Getting response...');
     // 5. Получаем ответ ассистента
     const messagesResponse = await fetch(`https://api.openai.com/v1/assistants/threads/${threadId}/messages`, {
       headers: {
@@ -111,61 +168,88 @@ async function generateMeditationSummary(userText) {
       }
     });
     
-    const messages = await messagesResponse.json();
-    const lastMessage = messages.data[0]; // Последнее сообщение (ответ ассистента)
+    if (!messagesResponse.ok) {
+      const errorText = await messagesResponse.text();
+      throw new Error(`Failed to get messages: ${messagesResponse.status} ${errorText}`);
+    }
     
-    // Возвращаем просто текст, как ожидается в основной функции
-    return lastMessage.content[0].text.value;
+    const messages = await messagesResponse.json();
+    const lastMessage = messages.data[0];
+    const responseText = lastMessage.content[0].text.value;
+    
+    console.log('Assistant response received:', responseText);
+    return responseText;
     
   } catch (error) {
-    console.error('Error with assistant:', error);
+    console.error('Error in generateMeditationSummary:', error);
     throw error;
   }
 }
 
 async function sendTextToTelegram(text, requestData) {
-  console.log('Sending text to Telegram...');
+  console.log('=== SENDING TEXT TO TELEGRAM ===');
+  console.log('Text to send:', text);
+  console.log('Request data keys:', Object.keys(requestData));
   
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   
-  // Пробуем разные варианты получения chat_id из BotHelp данных
+  if (!botToken) {
+    throw new Error('TELEGRAM_BOT_TOKEN not found in environment variables');
+  }
+  
+  // Пробуем разные варианты получения chat_id из данных
   const chatId = requestData.chat_id || 
                  requestData.chatId || 
                  requestData.user_id || 
                  requestData.userId ||
                  requestData.chat?.id ||
-                 requestData.from?.id;
+                 requestData.from?.id ||
+                 requestData.message?.chat?.id ||
+                 requestData.message?.from?.id;
   
-  console.log('Chat ID:', chatId);
+  console.log('Extracted chat ID:', chatId);
   console.log('Bot token exists:', !!botToken);
+  console.log('Bot token length:', botToken ? botToken.length : 0);
   
   if (!chatId) {
+    console.log('Available request data:', JSON.stringify(requestData, null, 2));
     throw new Error('Chat ID not found in request data');
   }
   
-  if (!botToken) {
-    throw new Error('Telegram bot token not configured');
+  const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+  const payload = {
+    chat_id: chatId,
+    text: text,
+    parse_mode: 'HTML'
+  };
+  
+  console.log('Telegram URL:', telegramUrl.replace(botToken, '[HIDDEN]'));
+  console.log('Payload:', JSON.stringify(payload, null, 2));
+  
+  try {
+    const response = await fetch(telegramUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    
+    const responseText = await response.text();
+    console.log('Telegram API response status:', response.status);
+    console.log('Telegram API response:', responseText);
+    
+    if (!response.ok) {
+      throw new Error(`Telegram API error: ${response.status} ${responseText}`);
+    }
+    
+    const result = JSON.parse(responseText);
+    console.log('Text message sent successfully. Result OK:', result.ok);
+    
+    return result;
+    
+  } catch (error) {
+    console.error('Error sending to Telegram:', error);
+    throw error;
   }
-  
-  const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: text,
-      parse_mode: 'HTML' // Поддержка HTML форматирования, если нужно
-    })
-  });
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Telegram API error: ${response.status} ${errorText}`);
-  }
-  
-  const result = await response.json();
-  console.log('Text message sent successfully:', result.ok);
-  
-  return result;
 }
