@@ -34,28 +34,99 @@ export default async function handler(req, res) {
 async function generateMeditationSummary(userText) {
   console.log('Generating meditation summary for:', userText);
   
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-    },
-    body: JSON.stringify({
-      model: "gpt-4o", // или "gpt-3.5-turbo" для более экономичного варианта
-      messages: [
-        {
-          role: "system",
-          content: `Ты должен прокомментировать то, что написал пользователь.`
-        },
-        {
-          role: "user",
-          content: `Опирайся на то, что написал пользователь: "${userText}"`
+  const ASSISTANT_ID = "asst_FTQwIDbblkhegDXBZxd2nU9w"; // Замените на ID вашего ассистента
+  const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+  
+  try {
+    // 1. Создаем thread (беседу)
+    const threadResponse = await fetch('https://api.openai.com/v1/assistants/threads', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'OpenAI-Beta': 'assistants=v2'
+      },
+      body: JSON.stringify({})
+    });
+    
+    const thread = await threadResponse.json();
+    const threadId = thread.id;
+    
+    // 2. Добавляем сообщение пользователя в thread
+    await fetch(`https://api.openai.com/v1/assistants/threads/${threadId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'OpenAI-Beta': 'assistants=v2'
+      },
+      body: JSON.stringify({
+        role: "user",
+        content: `Прокомментируй то, что написал пользователь: "${userText}"`
+      })
+    });
+    
+    // 3. Запускаем ассистента
+    const runResponse = await fetch(`https://api.openai.com/v1/assistants/threads/${threadId}/runs`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'OpenAI-Beta': 'assistants=v2'
+      },
+      body: JSON.stringify({
+        assistant_id: ASSISTANT_ID
+      })
+    });
+    
+    const run = await runResponse.json();
+    const runId = run.id;
+    
+    // 4. Ждем завершения выполнения
+    let runStatus;
+    do {
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Ждем 1 секунду
+      
+      const statusResponse = await fetch(`https://api.openai.com/v1/assistants/threads/${threadId}/runs/${runId}`, {
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'OpenAI-Beta': 'assistants=v2'
         }
-      ],
-      max_tokens: 200,
-      temperature: 0.7
-    })
-  });
+      });
+      
+      runStatus = await statusResponse.json();
+      console.log('Run status:', runStatus.status);
+      
+    } while (runStatus.status === 'queued' || runStatus.status === 'in_progress');
+    
+    if (runStatus.status !== 'completed') {
+      throw new Error(`Run failed with status: ${runStatus.status}`);
+    }
+    
+    // 5. Получаем ответ ассистента
+    const messagesResponse = await fetch(`https://api.openai.com/v1/assistants/threads/${threadId}/messages`, {
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'OpenAI-Beta': 'assistants=v2'
+      }
+    });
+    
+    const messages = await messagesResponse.json();
+    const lastMessage = messages.data[0]; // Последнее сообщение (ответ ассистента)
+    
+    return {
+      choices: [{
+        message: {
+          content: lastMessage.content[0].text.value
+        }
+      }]
+    };
+    
+  } catch (error) {
+    console.error('Error with assistant:', error);
+    throw error;
+  }
+}
   
   if (!response.ok) {
     const errorText = await response.text();
