@@ -60,7 +60,7 @@ async function generateMeditationSummary(userText) {
   try {
     console.log('Step 1: Creating thread...');
     // 1. Создаем thread (беседу)
-    const threadResponse = await fetch('https://api.openai.com/v1/assistants/threads', {
+    const threadResponse = await fetch('https://api.openai.com/v1/threads', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -81,7 +81,7 @@ async function generateMeditationSummary(userText) {
     
     console.log('Step 2: Adding message to thread...');
     // 2. Добавляем сообщение пользователя в thread
-    const messageResponse = await fetch(`https://api.openai.com/v1/assistants/threads/${threadId}/messages`, {
+    const messageResponse = await fetch(`https://api.openai.com/v1/threads/${threadId}/messages`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -103,7 +103,7 @@ async function generateMeditationSummary(userText) {
     
     console.log('Step 3: Running assistant...');
     // 3. Запускаем ассистента
-    const runResponse = await fetch(`https://api.openai.com/v1/assistants/threads/${threadId}/runs`, {
+    const runResponse = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -134,7 +134,7 @@ async function generateMeditationSummary(userText) {
       await new Promise(resolve => setTimeout(resolve, 1000));
       attempts++;
       
-      const statusResponse = await fetch(`https://api.openai.com/v1/assistants/threads/${threadId}/runs/${runId}`, {
+      const statusResponse = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs/${runId}`, {
         headers: {
           'Authorization': `Bearer ${OPENAI_API_KEY}`,
           'OpenAI-Beta': 'assistants=v2'
@@ -161,7 +161,7 @@ async function generateMeditationSummary(userText) {
     
     console.log('Step 5: Getting response...');
     // 5. Получаем ответ ассистента
-    const messagesResponse = await fetch(`https://api.openai.com/v1/assistants/threads/${threadId}/messages`, {
+    const messagesResponse = await fetch(`https://api.openai.com/v1/threads/${threadId}/messages`, {
       headers: {
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'OpenAI-Beta': 'assistants=v2'
