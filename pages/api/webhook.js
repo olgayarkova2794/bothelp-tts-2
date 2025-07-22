@@ -34,7 +34,7 @@ export default async function handler(req, res) {
 async function generateMeditationSummary(userText) {
   console.log('Generating meditation summary for:', userText);
   
-  const ASSISTANT_ID = "asst_FTQwIDbblkhegDXBZxd2nU9w"; // Замените на ID вашего ассистента
+  const ASSISTANT_ID = "asst_FTQwIDbblkhegDXBZxd2nU9w";
   const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
   
   try {
@@ -114,27 +114,13 @@ async function generateMeditationSummary(userText) {
     const messages = await messagesResponse.json();
     const lastMessage = messages.data[0]; // Последнее сообщение (ответ ассистента)
     
-    return {
-      choices: [{
-        message: {
-          content: lastMessage.content[0].text.value
-        }
-      }]
-    };
+    // Возвращаем просто текст, как ожидается в основной функции
+    return lastMessage.content[0].text.value;
     
   } catch (error) {
     console.error('Error with assistant:', error);
     throw error;
   }
-}
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenAI API error: ${response.status} ${errorText}`);
-  }
-  
-  const result = await response.json();
-  return result.choices[0].message.content.trim();
 }
 
 async function sendTextToTelegram(text, requestData) {
