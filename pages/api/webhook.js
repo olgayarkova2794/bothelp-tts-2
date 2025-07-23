@@ -96,13 +96,7 @@ async function generateMeditationSummary(webhookData) {
   
   // Автоматически заменяем все поля из конфигурации
   AVAILABLE_FIELDS.forEach(fieldName => {
-    if (fieldName === 'name') {
-      // Специальная логика для имени
-      finalPrompt = replaceField(finalPrompt, 'name', webhookData['Имя'] || webhookData['имя'] || webhookData.first_name);
-    } else {
-      // Обычные поля
-      finalPrompt = replaceField(finalPrompt, fieldName, webhookData[fieldName]);
-    }
+    finalPrompt = replaceField(finalPrompt, fieldName, webhookData[fieldName]);
   });
   
   console.log('Final prompt after template replacement:', finalPrompt);
