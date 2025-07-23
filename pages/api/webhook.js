@@ -154,8 +154,8 @@ async function sendBackToBotHelp(data, aiResponse) {
     
     // Отправляем данные обратно в BotHelp
     const payload = {
-      user_id: data.user_id,
       bothelp_user_id: data.bothelp_user_id,
+      user_id: data.user_id,
       ai_response_full: aiResponse,
       ai_response_date: new Date().toISOString(),
       analysis_status: 'completed'
