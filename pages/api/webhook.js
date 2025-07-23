@@ -1,3 +1,5 @@
+import { PROMPT_TEMPLATE, AVAILABLE_FIELDS } from './config.js';
+
 export default async function handler(req, res) {
   console.log('=== WEBHOOK STARTED ===');
   console.log('Received request method:', req.method);
@@ -9,17 +11,16 @@ export default async function handler(req, res) {
   
   try {
     const data = req.body;
-    const userText = data.voiceover_test || data.message?.text || 'Текст не найден';
     
     console.log('=== EXTRACTED DATA ===');
-    console.log('User text:', userText);
+    console.log('Full webhook data:', JSON.stringify(data, null, 2));
     console.log('Environment variables check:');
     console.log('OPENAI_API_KEY exists:', !!process.env.OPENAI_API_KEY);
     console.log('TELEGRAM_BOT_TOKEN exists:', !!process.env.TELEGRAM_BOT_TOKEN);
     
     // Генерируем саммари медитации через OpenAI
     console.log('=== CALLING OPENAI ASSISTANT ===');
-    const meditationSummary = await generateMeditationSummary(userText);
+    const meditationSummary = await generateMeditationSummary(data);
     console.log('Meditation summary generated:', meditationSummary);
     
     // Отправляем текстовое сообщение в Telegram
@@ -29,7 +30,7 @@ export default async function handler(req, res) {
     
     res.status(200).json({
       success: true,
-      message: `Саммари медитации отправлено: "${meditationSummary}"`,
+      message: `Саммари отправлено: "${meditationSummary}"`,
       telegramResult: telegramResult
     });
     
@@ -46,9 +47,9 @@ export default async function handler(req, res) {
   }
 }
 
-async function generateMeditationSummary(userText) {
+async function generateMeditationSummary(webhookData) {
   console.log('=== GENERATING MEDITATION SUMMARY ===');
-  console.log('Input text:', userText);
+  console.log('Webhook data received');
   
   const ASSISTANT_ID = "asst_FTQwIDbblkhegDXBZxd2nU9w";
   const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
@@ -56,6 +57,55 @@ async function generateMeditationSummary(userText) {
   if (!OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY not found in environment variables');
   }
+  
+  // Шаблон промпта с плейсхолдерами
+  const promptTemplate = `Ты говоришь с пользователем [name], его основной текст: [voiceover_test], 
+его намерение: [намерение], 
+ответ на магия вопрос 1: [Магия_вопрос1], 
+ответ на магия вопрос 2: [Магия_вопрос2],
+ответ на магия вопрос 3: [Магия_вопрос3],
+его достижения: [достижения],
+НГ желание: [НГ желание].
+
+Проанализируй и дай персональный комментарий.`;
+
+  // Заменяем плейсхолдеры на реальные данные
+  let finalPrompt = promptTemplate;
+  
+  // Функция для безопасной замены (если поле пустое, заменяем на "не указано")
+  const replaceField = (template, fieldName, value) => {
+    const placeholder = `[${fieldName}]`;
+    const replacement = value && value.toString().trim() ? value : 'не указано';
+    return template.replace(new RegExp(`\\[${fieldName.replace(/[.*+?^${}()|[\]\\]/g, '\\async function generateMeditationSummary(webhookData) {
+  console.log('=== GENERATING MEDITATION SUMMARY ===');
+  console.log('Webhook data received');
+  
+  const ASSISTANT_ID = "asst_FTQwIDbblkhegDXBZxd2nU9w";
+  const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+  
+  if (!OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY not found in environment variables');
+  }
+  
+  // Преобразуем данные webhook в текст для ассистента
+  const webhookText = JSON.stringify(webhookData, null, 2);
+  console.log('Sending webhook data to assistant');
+  
+  try {')}\\]`, 'g'), replacement);
+  };
+  
+  // Автоматически заменяем все поля из конфигурации
+  AVAILABLE_FIELDS.forEach(fieldName => {
+    if (fieldName === 'name') {
+      // Специальная логика для имени
+      finalPrompt = replaceField(finalPrompt, 'name', webhookData['Имя'] || webhookData['имя'] || webhookData.first_name);
+    } else {
+      // Обычные поля
+      finalPrompt = replaceField(finalPrompt, fieldName, webhookData[fieldName]);
+    }
+  });
+  
+  console.log('Final prompt after template replacement:', finalPrompt);
   
   try {
     console.log('Step 1: Creating thread...');
@@ -90,7 +140,7 @@ async function generateMeditationSummary(userText) {
       },
       body: JSON.stringify({
         role: "user",
-        content: `Прокомментируй то, что написал пользователь: "${userText}"`
+        content: finalPrompt
       })
     });
     
