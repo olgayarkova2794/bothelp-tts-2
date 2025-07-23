@@ -33,16 +33,7 @@ export default async function handler(req, res) {
     // Отправляем ответ в Telegram
     await sendToTelegram(response, data);
     
-    console.log('=== SENDING BACK TO BOTHELP ===');
-    // Отправляем обратно в BotHelp
-    await sendBackToBotHelp(data, response);
-    
-    res.status(200).json({ 
-      success: true, 
-      message: 'Ответ отправлен в бот и сохранен в BotHelp',
-      ai_response: response,
-      timestamp: new Date().toISOString()
-    });
+    res.status(200).json({ success: true, message: 'Ответ отправлен в бот' });
     
   } catch (error) {
     console.error('Error:', error);
@@ -134,54 +125,9 @@ async function sendToTelegram(text, data) {
     body: JSON.stringify({
       chat_id: chatId,
       text: text,
-      parse_mode: 'Markdown'
+      parse_mode: 'Markdown'  // Включаем поддержку Markdown
     })
   });
   
   console.log('Message sent to Telegram');
-}
-
-async function sendBackToBotHelp(data, aiResponse) {
-  try {
-    const bothelpWebhookUrl = process.env.BOTHELP_RETURN_WEBHOOK_URL;
-    
-    console.log('BotHelp return webhook URL configured:', !!bothelpWebhookUrl);
-    
-    if (!bothelpWebhookUrl) {
-      console.log('BotHelp return webhook not configured - skipping');
-      return;
-    }
-    
-    // Отправляем данные обратно в BotHelp
-    const payload = {
-      bothelp_user_id: data.bothelp_user_id,
-      user_id: data.user_id,
-      ai_response_full: aiResponse,
-      ai_response_date: new Date().toISOString(),
-      analysis_status: 'completed'
-    };
-    
-    console.log('Sending payload to BotHelp:', JSON.stringify(payload, null, 2));
-    
-    const response = await fetch(bothelpWebhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-    
-    console.log('BotHelp response status:', response.status);
-    const responseText = await response.text();
-    console.log('BotHelp response body:', responseText);
-    
-    if (response.ok) {
-      console.log('Data sent back to BotHelp successfully');
-    } else {
-      console.error('Failed to send back to BotHelp:', response.status, responseText);
-    }
-    
-  } catch (error) {
-    console.error('Error sending back to BotHelp:', error);
-  }
 }
