@@ -33,7 +33,10 @@ export default async function handler(req, res) {
     // Отправляем ответ в Telegram
     await sendToTelegram(response, data);
     
-    res.status(200).json({ success: true, message: 'Ответ отправлен в бот' });
+    // Записываем в Google Sheets
+    await saveToGoogleSheets(data, response);
+    
+    res.status(200).json({ success: true, message: 'Ответ отправлен в бот и записан в таблицу' });
     
   } catch (error) {
     console.error('Error:', error);
@@ -130,4 +133,95 @@ async function sendToTelegram(text, data) {
   });
   
   console.log('Message sent to Telegram');
+}
+
+async function sendBackToBotHelp(data, aiResponse) {
+  try {
+    const bothelpWebhookUrl = process.env.BOTHELP_RETURN_WEBHOOK_URL;
+    
+    if (!bothelpWebhookUrl) {
+      console.log('BotHelp return webhook not configured');
+      return;
+    }
+    
+    // Отправляем данные обратно в BotHelp
+    const payload = {
+      user_id: data.user_id,
+      bothelp_user_id: data.bothelp_user_id,
+      // Сохраняем ответ ИИ в новое поле
+      'ai_response_full': aiResponse,
+      'ai_response_date': new Date().toISOString(),
+      'analysis_status': 'completed'
+    };
+    
+    const response = await fetch(bothelpWebhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    
+    if (response.ok) {
+      console.log('Data sent back to BotHelp successfully');
+    } else {
+      console.error('Failed to send back to BotHelp:', response.status);
+    }
+    
+  } catch (error) {
+    console.error('Error sending back to BotHelp:', error);
+  }
+}
+
+async function saveToGoogleSheets(data, aiResponse) {
+  try {
+    const SHEET_ID = process.env.GOOGLE_SHEET_ID;
+    const API_KEY = process.env.GOOGLE_SHEETS_API_KEY;
+    
+    if (!SHEET_ID || !API_KEY) {
+      console.log('Google Sheets credentials not configured');
+      return;
+    }
+    
+    // Данные для записи в таблицу
+    const values = [
+      [
+        new Date().toISOString(), // Дата и время
+        data.name_test_voice || 'Не указано', // Имя
+        data['1_test_voice'] || '', // Намерение
+        data['2_test_voice'] || '', // Ответ 1
+        data['3_test_voice'] || '', // Ответ 2
+        data['4_test_voice'] || '', // Ответ 3
+        data['5_test_voice'] || '', // Ответ 4
+        data['6_test_voice'] || '', // Ответ 5
+        data['7_test_voice'] || '', // Ответ 6
+        data['8_test_voice'] || '', // Ответ 7
+        data['9_test_voice'] || '', // Ответ 8
+        data['10_test_voice'] || '', // Ответ 9
+        aiResponse // Ответ ИИ
+      ]
+    ];
+    
+    const response = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Sheet1:append?valueInputOption=RAW&key=${API_KEY}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          values: values
+        })
+      }
+    );
+    
+    if (response.ok) {
+      console.log('Data saved to Google Sheets successfully');
+    } else {
+      console.error('Failed to save to Google Sheets:', response.status);
+    }
+    
+  } catch (error) {
+    console.error('Error saving to Google Sheets:', error);
+  }
 }
