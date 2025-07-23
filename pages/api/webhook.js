@@ -139,8 +139,10 @@ async function sendBackToBotHelp(data, aiResponse) {
   try {
     const bothelpWebhookUrl = process.env.BOTHELP_RETURN_WEBHOOK_URL;
     
+    console.log('BotHelp return webhook URL configured:', !!bothelpWebhookUrl);
+    
     if (!bothelpWebhookUrl) {
-      console.log('BotHelp return webhook not configured');
+      console.log('BotHelp return webhook not configured - skipping');
       return;
     }
     
@@ -154,6 +156,8 @@ async function sendBackToBotHelp(data, aiResponse) {
       'analysis_status': 'completed'
     };
     
+    console.log('Sending payload to BotHelp:', JSON.stringify(payload, null, 2));
+    
     const response = await fetch(bothelpWebhookUrl, {
       method: 'POST',
       headers: {
@@ -162,66 +166,17 @@ async function sendBackToBotHelp(data, aiResponse) {
       body: JSON.stringify(payload)
     });
     
+    console.log('BotHelp response status:', response.status);
+    const responseText = await response.text();
+    console.log('BotHelp response body:', responseText);
+    
     if (response.ok) {
       console.log('Data sent back to BotHelp successfully');
     } else {
-      console.error('Failed to send back to BotHelp:', response.status);
+      console.error('Failed to send back to BotHelp:', response.status, responseText);
     }
     
   } catch (error) {
     console.error('Error sending back to BotHelp:', error);
-  }
-}
-
-async function saveToGoogleSheets(data, aiResponse) {
-  try {
-    const SHEET_ID = process.env.GOOGLE_SHEET_ID;
-    const API_KEY = process.env.GOOGLE_SHEETS_API_KEY;
-    
-    if (!SHEET_ID || !API_KEY) {
-      console.log('Google Sheets credentials not configured');
-      return;
-    }
-    
-    // Данные для записи в таблицу
-    const values = [
-      [
-        new Date().toISOString(), // Дата и время
-        data.name_test_voice || 'Не указано', // Имя
-        data['1_test_voice'] || '', // Намерение
-        data['2_test_voice'] || '', // Ответ 1
-        data['3_test_voice'] || '', // Ответ 2
-        data['4_test_voice'] || '', // Ответ 3
-        data['5_test_voice'] || '', // Ответ 4
-        data['6_test_voice'] || '', // Ответ 5
-        data['7_test_voice'] || '', // Ответ 6
-        data['8_test_voice'] || '', // Ответ 7
-        data['9_test_voice'] || '', // Ответ 8
-        data['10_test_voice'] || '', // Ответ 9
-        aiResponse // Ответ ИИ
-      ]
-    ];
-    
-    const response = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Sheet1:append?valueInputOption=RAW&key=${API_KEY}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          values: values
-        })
-      }
-    );
-    
-    if (response.ok) {
-      console.log('Data saved to Google Sheets successfully');
-    } else {
-      console.error('Failed to save to Google Sheets:', response.status);
-    }
-    
-  } catch (error) {
-    console.error('Error saving to Google Sheets:', error);
   }
 }
