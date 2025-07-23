@@ -33,10 +33,16 @@ export default async function handler(req, res) {
     // Отправляем ответ в Telegram
     await sendToTelegram(response, data);
     
-    // Записываем в Google Sheets
-    await saveToGoogleSheets(data, response);
+    console.log('=== SENDING BACK TO BOTHELP ===');
+    // Отправляем обратно в BotHelp
+    await sendBackToBotHelp(data, response);
     
-    res.status(200).json({ success: true, message: 'Ответ отправлен в бот и записан в таблицу' });
+    res.status(200).json({ 
+      success: true, 
+      message: 'Ответ отправлен в бот и сохранен в BotHelp',
+      ai_response: response,
+      timestamp: new Date().toISOString()
+    });
     
   } catch (error) {
     console.error('Error:', error);
@@ -128,7 +134,7 @@ async function sendToTelegram(text, data) {
     body: JSON.stringify({
       chat_id: chatId,
       text: text,
-      parse_mode: 'Markdown'  // Включаем поддержку Markdown
+      parse_mode: 'Markdown'
     })
   });
   
@@ -150,10 +156,9 @@ async function sendBackToBotHelp(data, aiResponse) {
     const payload = {
       user_id: data.user_id,
       bothelp_user_id: data.bothelp_user_id,
-      // Сохраняем ответ ИИ в новое поле
-      'ai_response_full': aiResponse,
-      'ai_response_date': new Date().toISOString(),
-      'analysis_status': 'completed'
+      ai_response_full: aiResponse,
+      ai_response_date: new Date().toISOString(),
+      analysis_status: 'completed'
     };
     
     console.log('Sending payload to BotHelp:', JSON.stringify(payload, null, 2));
