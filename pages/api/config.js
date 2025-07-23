@@ -37,7 +37,7 @@ export const PROMPT_TEMPLATE = `
 - Используй • для списков
 - Разбивай текст на абзацы
 - Используй эмодзи для улучшения восприятия
-`;`;
+`;
 
 // Обновленный список доступных полей
 export const AVAILABLE_FIELDS = [
@@ -71,7 +71,7 @@ export const FIELD_DESCRIPTIONS = {
 
 // Альтернативные варианты промптов (если понадобятся)
 export const PROMPT_ALTERNATIVES = {
-  short: `[name_test_voice], ты прошел игру на уверенность! 
+  short: `[name_test_voice], поздравляю с прохождением игры на уверенность! 
 Намерение: [1_test_voice]
 Главный инсайт: [2_test_voice]
 Достижения: [3_test_voice]
