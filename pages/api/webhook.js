@@ -61,14 +61,12 @@ export default async function handler(req, res) {
     await sendToTelegram(response, data);
     
     // ЕДИНСТВЕННОЕ ИЗМЕНЕНИЕ: добавляем ai_analysis в ответ
-    const timestamp = new Date().toISOString();
-    const responseWithTimestamp = `[${timestamp}] ${response}`;
     
     console.log('Returning to BotHelp - ai_analysis length:', responseWithTimestamp.length);
     res.status(200).json({ 
       success: true, 
       message: 'Ответ отправлен в бот',
-      ai_analysis: responseWithTimestamp  // <- С timestamp для отслеживания
+      ai_analysis: response  // <- С timestamp для отслеживания
     });
     
   } catch (error) {
