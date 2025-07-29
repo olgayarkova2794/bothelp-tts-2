@@ -158,15 +158,30 @@ async function sendToTelegram(text, data) {
   console.log('Sending to Telegram:');
   console.log('Chat ID:', chatId);
   console.log('Text length:', text.length);
-  console.log('Text preview:', text.substring(0, 200));
+  
+  // Улучшаем форматирование для Telegram
+  let formattedText = text
+    // Убираем звездочки и заменяем на жирный текст
+    .replace(/\*\*(.*?)\*\*/g, '*$1*')  // **текст** → *текст*
+    .replace(/\*(.*?)\*/g, '*$1*')      // *текст* → *текст* (оставляем как есть)
+    // Убираем лишние переносы строк
+    .replace(/\n{3,}/g, '\n\n')
+    // Исправляем списки для лучшей читаемости
+    .replace(/^• /gm, '▪️ ')
+    .trim();
+  
+  // Ограничиваем длину сообщения
+  if (formattedText.length > 4096) {
+    formattedText = formattedText.substring(0, 4093) + '...';
+  }
   
   await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       chat_id: chatId,
-      text: text,
-      parse_mode: 'Markdown'  // Включаем поддержку Markdown
+      text: formattedText,
+      parse_mode: 'Markdown'
     })
   });
   
