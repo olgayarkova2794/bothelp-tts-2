@@ -131,3 +131,25 @@ async function sendToTelegram(text, data) {
   
   console.log('Message sent to Telegram');
 }
+
+
+    
+    // Получаем ответ от OpenAI
+    const aiResponse = await callOpenAIAssistant(prompt);
+    
+    // Отправляем ответ в Telegram
+    await sendToTelegram(aiResponse, data);
+    
+    // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: возвращаем ответ ИИ в JSON
+    res.status(200).json({ 
+      success: true, 
+      message: 'Ответ отправлен в бот',
+      // Это поле будет доступно для сопоставления в BotHelp
+      ai_analysis: aiResponse
+    });
+    
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
