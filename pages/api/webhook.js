@@ -1,7 +1,8 @@
 import { PROMPT_TEMPLATE } from './config.js';
 
 export default async function handler(req, res) {
-  console.log('=== WEBHOOK STARTED ===');
+  const requestId = Math.random().toString(36).substring(7);
+  console.log(`=== WEBHOOK STARTED [${requestId}] ===`);
   
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -10,6 +11,27 @@ export default async function handler(req, res) {
   try {
     const data = req.body;
     console.log('Received data from BotHelp');
+    console.log('User name:', data.name_test_voice);
+    console.log('Has test data:', !!data['1_test_voice']);
+    
+    // ПРОВЕРЯЕМ, что у нас есть минимальные данные
+    if (!data.name_test_voice || data.name_test_voice === 'Клиент') {
+      console.log('❌ Insufficient data - name is missing or default');
+      return res.status(400).json({ 
+        error: 'Insufficient data', 
+        message: 'Name is required' 
+      });
+    }
+    
+    // Дополнительная проверка на наличие хотя бы одного ответа
+    const hasAnswers = data['1_test_voice'] || data['2_test_voice'] || data['3_test_voice'];
+    if (!hasAnswers) {
+      console.log('❌ No test answers provided');
+      return res.status(400).json({ 
+        error: 'No answers', 
+        message: 'At least one answer is required' 
+      });
+    }
     
     // Заменяем плейсхолдеры в промпте на реальные данные
     let prompt = PROMPT_TEMPLATE
@@ -25,19 +47,28 @@ export default async function handler(req, res) {
       .replace('[9_test_voice]', data['9_test_voice'] || 'не указано')
       .replace('[10_test_voice]', data['10_test_voice'] || 'не указано');
     
-    console.log('Sending prompt to OpenAI assistant');
+    console.log(`[${requestId}] Sending prompt to OpenAI assistant`);
     
     // Отправляем в OpenAI
     const response = await callOpenAIAssistant(prompt);
+    
+    console.log('AI Response received:');
+    console.log('Length:', response.length);
+    console.log('First 300 chars:', response.substring(0, 300));
+    console.log('Last 300 chars:', response.substring(response.length - 300));
     
     // Отправляем ответ в Telegram
     await sendToTelegram(response, data);
     
     // ЕДИНСТВЕННОЕ ИЗМЕНЕНИЕ: добавляем ai_analysis в ответ
+    const timestamp = new Date().toISOString();
+    const responseWithTimestamp = `[${timestamp}] ${response}`;
+    
+    console.log('Returning to BotHelp - ai_analysis length:', responseWithTimestamp.length);
     res.status(200).json({ 
       success: true, 
       message: 'Ответ отправлен в бот',
-      ai_analysis: response  // <- ДОБАВИЛИ ЭТУ СТРОЧКУ
+      ai_analysis: responseWithTimestamp  // <- С timestamp для отслеживания
     });
     
   } catch (error) {
@@ -123,6 +154,11 @@ async function callOpenAIAssistant(prompt) {
 async function sendToTelegram(text, data) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = data.user_id || data.chat_id;
+  
+  console.log('Sending to Telegram:');
+  console.log('Chat ID:', chatId);
+  console.log('Text length:', text.length);
+  console.log('Text preview:', text.substring(0, 200));
   
   await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: 'POST',
