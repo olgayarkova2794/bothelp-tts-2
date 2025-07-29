@@ -1,4 +1,4 @@
-import { PROMPT_TEMPLATE } from './config.js';
+import { PROMPT_TEMPLATE, FOLLOW_UP_PROMPT_TEMPLATE } from './config.js';
 
 export default async function handler(req, res) {
   const requestId = Math.random().toString(36).substring(7);
@@ -13,44 +13,46 @@ export default async function handler(req, res) {
     console.log('Received data from BotHelp');
     console.log('User name:', data.name_test_voice);
     console.log('Has test data:', !!data['1_test_voice']);
+    console.log('Has follow-up question:', !!data.user_question);
+    console.log('Has previous analysis:', !!data.ai_analysis_result);
     
-    // ПРОВЕРЯЕМ, что у нас есть минимальные данные
-    if (!data.name_test_voice || data.name_test_voice === 'Клиент') {
-      console.log('❌ Insufficient data - name is missing or default');
-      return res.status(400).json({ 
-        error: 'Insufficient data', 
-        message: 'Name is required' 
-      });
+    // Определяем тип запроса
+    const isFollowUpQuestion = data.user_question && data.ai_analysis_result;
+    
+    let prompt;
+    let response;
+    
+    if (isFollowUpQuestion) {
+      // Это дополнительный вопрос к уже проведенному анализу
+      console.log('Processing follow-up question');
+      prompt = createFollowUpPrompt(data);
+      response = await callOpenAIAssistant(prompt);
+    } else {
+      // Это первичный анализ ответов
+      console.log('Processing initial analysis');
+      
+      // ПРОВЕРЯЕМ, что у нас есть минимальные данные для первичного анализа
+      if (!data.name_test_voice || data.name_test_voice === 'Клиент') {
+        console.log('❌ Insufficient data - name is missing or default');
+        return res.status(400).json({ 
+          error: 'Insufficient data', 
+          message: 'Name is required' 
+        });
+      }
+      
+      // Дополнительная проверка на наличие хотя бы одного ответа
+      const hasAnswers = data['1_test_voice'] || data['2_test_voice'] || data['3_test_voice'];
+      if (!hasAnswers) {
+        console.log('❌ No test answers provided');
+        return res.status(400).json({ 
+          error: 'No answers', 
+          message: 'At least one answer is required' 
+        });
+      }
+      
+      prompt = createInitialPrompt(data);
+      response = await callOpenAIAssistant(prompt);
     }
-    
-    // Дополнительная проверка на наличие хотя бы одного ответа
-    const hasAnswers = data['1_test_voice'] || data['2_test_voice'] || data['3_test_voice'];
-    if (!hasAnswers) {
-      console.log('❌ No test answers provided');
-      return res.status(400).json({ 
-        error: 'No answers', 
-        message: 'At least one answer is required' 
-      });
-    }
-    
-    // Заменяем плейсхолдеры в промпте на реальные данные
-    let prompt = PROMPT_TEMPLATE
-      .replace('[name_test_voice]', data.name_test_voice || 'Клиент')
-      .replace('[1_test_voice]', data['1_test_voice'] || 'не указано')
-      .replace('[2_test_voice]', data['2_test_voice'] || 'не указано')
-      .replace('[3_test_voice]', data['3_test_voice'] || 'не указано')
-      .replace('[4_test_voice]', data['4_test_voice'] || 'не указано')
-      .replace('[5_test_voice]', data['5_test_voice'] || 'не указано')
-      .replace('[6_test_voice]', data['6_test_voice'] || 'не указано')
-      .replace('[7_test_voice]', data['7_test_voice'] || 'не указано')
-      .replace('[8_test_voice]', data['8_test_voice'] || 'не указано')
-      .replace('[9_test_voice]', data['9_test_voice'] || 'не указано')
-      .replace('[10_test_voice]', data['10_test_voice'] || 'не указано');
-    
-    console.log(`[${requestId}] Sending prompt to OpenAI assistant`);
-    
-    // Отправляем в OpenAI
-    const response = await callOpenAIAssistant(prompt);
     
     console.log('AI Response received:');
     console.log('Length:', response.length);
@@ -60,19 +62,54 @@ export default async function handler(req, res) {
     // Отправляем ответ в Telegram
     await sendToTelegram(response, data);
     
-    // ЕДИНСТВЕННОЕ ИЗМЕНЕНИЕ: добавляем ai_analysis в ответ
-    
-    console.log('Returning to BotHelp - ai_analysis length:', responseWithTimestamp.length);
-    res.status(200).json({ 
+    // Возвращаем результат в BotHelp
+    const responseData = {
       success: true, 
       message: 'Ответ отправлен в бот',
-      ai_analysis: response  // <- С timestamp для отслеживания
-    });
+      ai_analysis_result: response  // Обновляем переменную с результатом
+    };
+    
+    console.log('Returning to BotHelp - ai_analysis_result length:', response.length);
+    res.status(200).json(responseData);
     
   } catch (error) {
     console.error('Error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
+}
+
+function createInitialPrompt(data) {
+  // Заменяем плейсхолдеры в промпте на реальные данные
+  return PROMPT_TEMPLATE
+    .replace(/\[name_test_voice\]/g, data.name_test_voice || 'Клиент')
+    .replace(/\[1_test_voice\]/g, data['1_test_voice'] || 'не указано')
+    .replace(/\[2_test_voice\]/g, data['2_test_voice'] || 'не указано')
+    .replace(/\[3_test_voice\]/g, data['3_test_voice'] || 'не указано')
+    .replace(/\[4_test_voice\]/g, data['4_test_voice'] || 'не указано')
+    .replace(/\[5_test_voice\]/g, data['5_test_voice'] || 'не указано')
+    .replace(/\[6_test_voice\]/g, data['6_test_voice'] || 'не указано')
+    .replace(/\[7_test_voice\]/g, data['7_test_voice'] || 'не указано')
+    .replace(/\[8_test_voice\]/g, data['8_test_voice'] || 'не указано')
+    .replace(/\[9_test_voice\]/g, data['9_test_voice'] || 'не указано')
+    .replace(/\[10_test_voice\]/g, data['10_test_voice'] || 'не указано');
+}
+
+function createFollowUpPrompt(data) {
+  // Создаем промпт для дополнительного вопроса
+  return FOLLOW_UP_PROMPT_TEMPLATE
+    .replace(/\[name_test_voice\]/g, data.name_test_voice || 'Клиент')
+    .replace(/\[previous_analysis\]/g, data.ai_analysis_result || '')
+    .replace(/\[user_question\]/g, data.user_question || '')
+    .replace(/\[1_test_voice\]/g, data['1_test_voice'] || 'не указано')
+    .replace(/\[2_test_voice\]/g, data['2_test_voice'] || 'не указано')
+    .replace(/\[3_test_voice\]/g, data['3_test_voice'] || 'не указано')
+    .replace(/\[4_test_voice\]/g, data['4_test_voice'] || 'не указано')
+    .replace(/\[5_test_voice\]/g, data['5_test_voice'] || 'не указано')
+    .replace(/\[6_test_voice\]/g, data['6_test_voice'] || 'не указано')
+    .replace(/\[7_test_voice\]/g, data['7_test_voice'] || 'не указано')
+    .replace(/\[8_test_voice\]/g, data['8_test_voice'] || 'не указано')
+    .replace(/\[9_test_voice\]/g, data['9_test_voice'] || 'не указано')
+    .replace(/\[10_test_voice\]/g, data['10_test_voice'] || 'не указано');
 }
 
 async function callOpenAIAssistant(prompt) {
