@@ -86,7 +86,7 @@ export const FOLLOW_UP_PROMPT_TEMPLATE = `
 `;
 
 // Обновленный список доступных полей с новыми полями для дополнительных вопросов
-// Обновленный список доступных полей с разными переменными для результатов
+// Обновленный список доступных полей с полем статуса
 export const AVAILABLE_FIELDS = [
   'name_test_voice',       // Имя клиента
   '1_test_voice',          // Намерение на игру
@@ -101,7 +101,8 @@ export const AVAILABLE_FIELDS = [
   '10_test_voice',         // Ситуация с недостатком уверенности
   'user_question',         // Дополнительный вопрос пользователя
   'ai_analysis_result',    // Результат первичного анализа
-  'ai_followup_result'     // Результат дополнительного анализа
+  'ai_followup_result',    // Результат дополнительного анализа
+  'ai_status'              // Статус процесса: ai_analysis_received, question_asked, followup_analysis_received
 ];
 
 // Описания полей для справки
@@ -119,5 +120,7 @@ export const FIELD_DESCRIPTIONS = {
   '10_test_voice': 'Ситуация, когда тебе хотелось что-то сделать, но не было достаточной уверенности',
   'user_question': 'Дополнительный вопрос пользователя',
   'ai_analysis_result': 'Результат первичного анализа ИИ',
-  'ai_followup_result': 'Результат дополнительного анализа ИИ'
+  'ai_followup_result': 'Результат дополнительного анализа ИИ',
+  'ai_status': 'Статус процесса: ai_analysis_received, question_asked, followup_analysis_received'
 };
+
