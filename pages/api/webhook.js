@@ -15,21 +15,32 @@ export default async function handler(req, res) {
     console.log('Has test data:', !!data['1_test_voice']);
     console.log('Has follow-up question:', !!data.user_question);
     console.log('Has previous analysis:', !!data.ai_analysis_result);
+    console.log('AI Status:', data.ai_status);
     
-    // Определяем тип запроса
-    const isFollowUpQuestion = data.user_question && data.ai_analysis_result;
+    // Определяем тип запроса по статусу
+    const isFollowUpQuestion = data.ai_status === 'question_asked';
     
     let prompt;
     let response;
     
     if (isFollowUpQuestion) {
       // Это дополнительный вопрос к уже проведенному анализу
-      console.log('Processing follow-up question');
+      console.log('Processing follow-up question - status: question_asked');
+      
+      // Проверяем, что есть вопрос и предыдущий анализ
+      if (!data.user_question || !data.ai_analysis_result) {
+        console.log('❌ Missing data for follow-up question');
+        return res.status(400).json({ 
+          error: 'Missing data for follow-up', 
+          message: 'User question and previous analysis are required for follow-up' 
+        });
+      }
+      
       prompt = createFollowUpPrompt(data);
       response = await callOpenAIAssistant(prompt);
     } else {
       // Это первичный анализ ответов
-      console.log('Processing initial analysis');
+      console.log('Processing initial analysis - status:', data.ai_status || 'undefined');
       
       // ПРОВЕРЯЕМ, что у нас есть минимальные данные для первичного анализа
       if (!data.name_test_voice || data.name_test_voice === 'Клиент') {
@@ -66,21 +77,23 @@ export default async function handler(req, res) {
     let responseData;
     
     if (isFollowUpQuestion) {
-      // Для дополнительного вопроса сохраняем в отдельную переменную
+      // Для дополнительного вопроса сохраняем в отдельную переменную и обновляем статус
       responseData = {
         success: true, 
         message: 'Ответ на дополнительный вопрос отправлен в бот',
-        ai_followup_result: response  // Результат дополнительного анализа
+        ai_followup_result: response,  // Результат дополнительного анализа
       };
       console.log('Returning to BotHelp - ai_followup_result length:', response.length);
+      console.log('Updated status to: followup_analysis_received');
     } else {
-      // Для первичного анализа сохраняем в основную переменную
+      // Для первичного анализа сохраняем в основную переменную и обновляем статус
       responseData = {
         success: true, 
         message: 'Первичный анализ отправлен в бот',
-        ai_analysis_result: response  // Результат первичного анализа
+        ai_analysis_result: response,  // Результат первичного анализа
       };
       console.log('Returning to BotHelp - ai_analysis_result length:', response.length);
+      console.log('Updated status to: ai_analysis_received');
     }
     res.status(200).json(responseData);
     
