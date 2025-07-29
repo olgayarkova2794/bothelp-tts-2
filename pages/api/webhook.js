@@ -77,23 +77,21 @@ export default async function handler(req, res) {
     let responseData;
     
     if (isFollowUpQuestion) {
-      // Для дополнительного вопроса сохраняем в отдельную переменную и обновляем статус
+      // Для дополнительного вопроса сохраняем в отдельную переменную
       responseData = {
         success: true, 
         message: 'Ответ на дополнительный вопрос отправлен в бот',
-        ai_followup_result: response,  // Результат дополнительного анализа
+        ai_followup_result: response  // Результат дополнительного анализа
       };
       console.log('Returning to BotHelp - ai_followup_result length:', response.length);
-      console.log('Updated status to: followup_analysis_received');
     } else {
-      // Для первичного анализа сохраняем в основную переменную и обновляем статус
+      // Для первичного анализа сохраняем в основную переменную
       responseData = {
         success: true, 
         message: 'Первичный анализ отправлен в бот',
-        ai_analysis_result: response,  // Результат первичного анализа
+        ai_analysis_result: response  // Результат первичного анализа
       };
       console.log('Returning to BotHelp - ai_analysis_result length:', response.length);
-      console.log('Updated status to: ai_analysis_received');
     }
     res.status(200).json(responseData);
     
@@ -215,9 +213,22 @@ async function sendToTelegram(text, data) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = data.user_id || data.chat_id;
   
-  console.log('Sending to Telegram:');
+  console.log('=== TELEGRAM SENDING DEBUG ===');
+  console.log('Bot Token exists:', !!botToken);
+  console.log('Bot Token length:', botToken ? botToken.length : 0);
   console.log('Chat ID:', chatId);
-  console.log('Text length:', text.length);
+  console.log('Chat ID type:', typeof chatId);
+  console.log('Original text length:', text.length);
+  
+  if (!botToken) {
+    console.error('❌ TELEGRAM_BOT_TOKEN is missing!');
+    return;
+  }
+  
+  if (!chatId) {
+    console.error('❌ Chat ID is missing!');
+    return;
+  }
   
   // Улучшаем форматирование для Telegram
   let formattedText = text
@@ -235,15 +246,60 @@ async function sendToTelegram(text, data) {
     formattedText = formattedText.substring(0, 4093) + '...';
   }
   
-  await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: formattedText,
-      parse_mode: 'Markdown'
-    })
-  });
+  console.log('Formatted text length:', formattedText.length);
+  console.log('First 200 chars of formatted text:', formattedText.substring(0, 200));
   
-  console.log('Message sent to Telegram');
+  const requestBody = {
+    chat_id: chatId,
+    text: formattedText,
+    parse_mode: 'Markdown'
+  };
+  
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody)
+    });
+    
+    const responseData = await response.json();
+    
+    console.log('Telegram API response status:', response.status);
+    console.log('Telegram API response:', JSON.stringify(responseData, null, 2));
+    
+    if (!response.ok) {
+      console.error('❌ Telegram API error:', responseData);
+      
+      // Если проблема с Markdown, попробуем без форматирования
+      if (responseData.description && responseData.description.includes('parse')) {
+        console.log('🔄 Retrying without Markdown formatting...');
+        
+        const retryResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: formattedText
+            // Убираем parse_mode
+          })
+        });
+        
+        const retryData = await retryResponse.json();
+        console.log('Retry response:', JSON.stringify(retryData, null, 2));
+        
+        if (retryResponse.ok) {
+          console.log('✅ Message sent without formatting');
+        } else {
+          console.error('❌ Retry also failed:', retryData);
+        }
+      }
+    } else {
+      console.log('✅ Message sent to Telegram successfully');
+    }
+    
+  } catch (error) {
+    console.error('❌ Error sending to Telegram:', error);
+  }
+  
+  console.log('=== TELEGRAM DEBUG END ===');
 }
