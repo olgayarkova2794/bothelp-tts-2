@@ -62,14 +62,26 @@ export default async function handler(req, res) {
     // Отправляем ответ в Telegram
     await sendToTelegram(response, data);
     
-    // Возвращаем результат в BotHelp
-    const responseData = {
-      success: true, 
-      message: 'Ответ отправлен в бот',
-      ai_analysis_result: response  // Обновляем переменную с результатом
-    };
+    // Возвращаем результат в BotHelp с разными именами переменных
+    let responseData;
     
-    console.log('Returning to BotHelp - ai_analysis_result length:', response.length);
+    if (isFollowUpQuestion) {
+      // Для дополнительного вопроса сохраняем в отдельную переменную
+      responseData = {
+        success: true, 
+        message: 'Ответ на дополнительный вопрос отправлен в бот',
+        ai_followup_result: response  // Результат дополнительного анализа
+      };
+      console.log('Returning to BotHelp - ai_followup_result length:', response.length);
+    } else {
+      // Для первичного анализа сохраняем в основную переменную
+      responseData = {
+        success: true, 
+        message: 'Первичный анализ отправлен в бот',
+        ai_analysis_result: response  // Результат первичного анализа
+      };
+      console.log('Returning to BotHelp - ai_analysis_result length:', response.length);
+    }
     res.status(200).json(responseData);
     
   } catch (error) {
@@ -98,7 +110,7 @@ function createFollowUpPrompt(data) {
   // Создаем промпт для дополнительного вопроса
   return FOLLOW_UP_PROMPT_TEMPLATE
     .replace(/\[name_test_voice\]/g, data.name_test_voice || 'Клиент')
-    .replace(/\[previous_analysis\]/g, data.ai_analysis_result || '')
+    .replace(/\[previous_analysis\]/g, data.ai_analysis_result || '')  // Берем первичный анализ
     .replace(/\[user_question\]/g, data.user_question || '')
     .replace(/\[1_test_voice\]/g, data['1_test_voice'] || 'не указано')
     .replace(/\[2_test_voice\]/g, data['2_test_voice'] || 'не указано')
