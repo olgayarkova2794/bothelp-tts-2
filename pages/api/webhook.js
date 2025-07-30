@@ -229,8 +229,11 @@ async function callOpenAIAssistant(prompt) {
     }
   });
   
-  // Очищаем лишние пробелы
-  cleanResponse = cleanResponse.replace(/\s+/g, ' ').trim();
+  // Убираем только лишние пробелы, но сохраняем переносы строк
+  cleanResponse = cleanResponse
+    .replace(/[ \t]+/g, ' ')  // Убираем лишние пробелы и табы, но не переносы
+    .replace(/\n\s*\n\s*\n/g, '\n\n')  // Убираем тройные и более переносы
+    .trim();
   
   // Добавляем источники в конце, если они есть
   if (sourceLinks.length > 0) {
