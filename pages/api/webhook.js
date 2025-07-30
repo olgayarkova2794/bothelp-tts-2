@@ -203,5 +203,39 @@ async function callOpenAIAssistant(prompt) {
   });
   
   const messages = await messagesResponse.json();
-  return messages.data[0].content[0].text.value;
+  const message = messages.data[0];
+  const rawResponse = message.content[0].text.value;
+  
+  // Извлекаем аннотации (ссылки на источники)
+  const annotations = message.content[0].text.annotations || [];
+  
+  // Очищаем текст от встроенных ссылок на источники
+  let cleanResponse = rawResponse;
+  let sourceLinks = [];
+  
+  // Обрабатываем каждую аннотацию
+  annotations.forEach((annotation, index) => {
+    // Убираем встроенную ссылку из текста
+    cleanResponse = cleanResponse.replace(annotation.text, '');
+    
+    // Извлекаем реальную ссылку
+    if (annotation.file_citation) {
+      sourceLinks.push(`Источник ${index + 1}: ${annotation.file_citation.file_id}`);
+    } else if (annotation.file_path) {
+      sourceLinks.push(`Файл ${index + 1}: ${annotation.file_path.file_id}`);
+    } else {
+      // Если есть другие типы аннотаций, добавляем их
+      sourceLinks.push(`Источник ${index + 1}: ${annotation.text}`);
+    }
+  });
+  
+  // Очищаем лишние пробелы
+  cleanResponse = cleanResponse.replace(/\s+/g, ' ').trim();
+  
+  // Добавляем источники в конце, если они есть
+  if (sourceLinks.length > 0) {
+    cleanResponse += '\n\n📚 Источники:\n' + sourceLinks.join('\n');
+  }
+  
+  return cleanResponse;
 }
