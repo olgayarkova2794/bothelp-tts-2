@@ -70,9 +70,6 @@ export default async function handler(req, res) {
     console.log('First 300 chars:', response.substring(0, 300));
     console.log('Last 300 chars:', response.substring(response.length - 300));
     
-    // Отправляем ответ в Telegram
-    await sendToTelegram(response, data);
-    
     // Возвращаем результат в BotHelp с разными именами переменных
     let responseData;
     
